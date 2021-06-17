@@ -1,21 +1,89 @@
 #include <stdio.h>
-#include <sys/socket.h>
 #include <stdlib.h>
-#include <netinet/in.h>
-#include <string.h>
-#include <unistd.h>
-#include <arpa/inet.h>
-#include <stdbool.h>
-#include <ctype.h>
 #include <errno.h>
-#include <netdb.h>
-#define PORT 8080
-#define SIZE 1024
+#include <netinet/in.h> 
+#include <netdb.h> 
+#include <unistd.h>
+#include <string.h>
+#include <ctype.h>
 
-typedef struct account{
-    char id[1024];
-    char pass[1024];
-}akun;
+#define SIZE_BUF 1024
+
+int register_login(int fd, char cmd[], char id[], char password[], int isSuperUser){
+    int ret_val, isFound = 0;
+	char message[SIZE_BUF];
+	if(isSuperUser){
+		sprintf(id, "%s", "root");
+		sprintf(password, "%s", "root");
+	}else{
+   		 //input/sending id and password
+		printf("saya\n");
+    	ret_val = send(fd, id, SIZE_BUF, 0);
+    	ret_val = send(fd, password, SIZE_BUF, 0);
+		ret_val = recv(fd, message, SIZE_BUF, 0);
+	}
+    printf("\e[32mUsername\n> \e[0m");
+	printf("%s\n", id);
+
+    printf("\e[32mPassword\n> \e[0m");
+	printf("%s\n", password);
+	printf("\n");
+
+	//check if its terminate condition
+	if(isSuperUser){
+		printf("You are root!\n\n");
+		return 1;
+	}
+	else if(!strcmp(message, "regloginsuccess\n")){
+		puts(message);
+		return 1;
+	}
+	else if(!strcmp(message, "wrongpass\n")) {
+		printf("Id or Passsword doesn't match !\n\n");
+		return 0;
+	}
+}
+
+void see_books(int fd){
+    int ret_val;
+    char temp[SIZE_BUF], flag[100];
+    int loop = 1;
+
+    ret_val = recv(fd, flag, SIZE_BUF, 0);
+    // printf("%s\n", flag);
+    puts("");
+    while(loop){
+        ret_val = recv(fd, temp, SIZE_BUF, 0);
+        if(strstr(temp, "done") != NULL){
+            loop = 0;
+            break;
+        }
+        printf("Nama: %s\n", temp);
+
+        ret_val = recv(fd, temp, SIZE_BUF, 0);
+        printf("Publisher: %s\n", temp);
+
+        ret_val = recv(fd, temp, SIZE_BUF, 0);
+        printf("Tahun publishing: %s\n", temp);
+
+        ret_val = recv(fd, temp, SIZE_BUF, 0);
+        printf("Esktensi file: %s\n", temp);
+
+        ret_val = recv(fd, temp, SIZE_BUF, 0);
+        printf("FilePath: %s\n\n", temp);
+
+    }
+}
+
+int getIdPass(int length, char *str[], char id[], char pass[]){
+   if(length != 5) return 0;
+   if(!strcmp(str[1], "-u") && !strcmp(str[3], "-p")){
+      sprintf(id, "%s", str[2]);
+      sprintf(pass, "%s", str[4]);
+	  return 1;
+   }
+   return 0;
+}
 
 char *trimString(char *str)
 {
@@ -30,11 +98,11 @@ char *trimString(char *str)
 
 char *getStrBetween(char *str, char *PATTERN1, char *PATTERN2){
     if(PATTERN1 == NULL){
-        char temp[SIZE]; 
+        char temp[SIZE_BUF]; 
 		sprintf(temp, "[INI_HANYA_HIASAN]%s", str);
         return getStrBetween(temp, "[INI_HANYA_HIASAN]", PATTERN2);
     }else if(PATTERN2 == NULL){
-        char temp[SIZE]; 
+        char temp[SIZE_BUF]; 
 		sprintf(temp, "%s[INI_HANYA_HIASAN]", str);
         return getStrBetween(temp, PATTERN1, "[INI_HANYA_HIASAN]");
     }
@@ -79,9 +147,9 @@ char* removeSemicolon(char *str){
 	return str;
 }
 
-void read_cmd(char *command_cpy, bool isSudo, int sock){
-    char *fullCommand = trimString(command_cpy);
-	char command_temp[SIZE]; sprintf(command_temp, "%s", fullCommand);
+void read_cmd(char *command_cpy){
+	char *fullCommand = trimString(command_cpy);
+	char command_temp[SIZE_BUF]; sprintf(command_temp, "%s", fullCommand);
 	char *cmd = trimString(strtok(command_temp, " "));
 	int isWrongCmd = 0;
 	printf("Command Inserted : %s\n", command_cpy);
@@ -91,7 +159,7 @@ void read_cmd(char *command_cpy, bool isSudo, int sock){
 		char *nxt_cmd = trimString(strtok(NULL, " "));
 		printf("\tQuery : %s\n", nxt_cmd);
 
-		if(!strcmp(nxt_cmd, "USER") && isSudo){
+		if(!strcmp(nxt_cmd, "USER")){
 			char *id = trimString(strtok(NULL, " "));
 			char *pass, *nxt_cmd2, *nxt_cmd3;
 			//cek kalo format udah sesuai
@@ -105,6 +173,9 @@ void read_cmd(char *command_cpy, bool isSudo, int sock){
 						if(strstr(pass, ";"))
 							pass = removeSemicolon(pass);
 						else isWrongCmd = 1;
+
+
+						
 					}else isWrongCmd = 1;
 				}else isWrongCmd = 1;
 			}else isWrongCmd = 1;
@@ -113,61 +184,428 @@ void read_cmd(char *command_cpy, bool isSudo, int sock){
 			if(isWrongCmd){
 				printf("\tWrong Command\n");
 			}else{
-				akun newAkun;
-                printf("\tUsername : %s\n", id);
-                strcpy(newAkun.id,id);
+				printf("\tUsername : %s\n", id);
 				printf("\tPassword : %s\n", pass);
-                strcpy(newAkun.pass,pass);
-                send(sock, (void *)&newAkun, sizeof(newAkun), 0);
 			}
 			printf("\n");
 		}
-    }
+		else if(!strcmp(nxt_cmd, "DATABASE")){
+			char *database = trimString(strtok(NULL, " "));
+			if(database){
+				if(strstr(database, ";")){
+					// bikin database
+					database = removeSemicolon(database);
+				}
+				else isWrongCmd = 1;
+			}else isWrongCmd = 1;
+
+			//hasil pengecekan
+			if(isWrongCmd){
+				printf("\tWrong Command\n");
+			}else{
+				printf("\tDatabase : %s\n", database);
+			}
+			printf("\n");
+		}
+		else if(!strcmp(nxt_cmd, "TABLE")){
+			char *table_name = trimString(strtok(NULL, " "));
+			char *all_columns = trimString(getStrBetween(fullCommand, "(", ")"));
+			char *col_name, *col_type, *col_temp;
+			printf("\tTable Name : %s\n", table_name);
+			if(all_columns && strstr(fullCommand, ";")){
+				col_temp = strtok(all_columns, ",");	
+				while(col_temp ){
+					//buat tabel berdasarkan kolom di sini
+					col_temp = trimString(col_temp);
+					col_name = trimString(getStrBetween(col_temp, NULL, " "));
+					col_type = trimString(getStrBetween(col_temp, col_name, NULL));
+					printf("\t\tName | Type : %s | %s\n", col_name, col_type);
+					col_temp = strtok(NULL, ",");
+				}
+			}else isWrongCmd = 1;
+
+			//hasil pengecekan
+			if(isWrongCmd){
+				printf("\tWrong Command\n");
+			}
+			printf("\n");
+		}
+	}
+	else if(!strcmp(cmd, "USE")){
+		char *database = trimString(strtok(NULL, " "));
+			if(database){
+				if(strstr(database, ";")){
+					// bikin database
+					database = removeSemicolon(database);
+				}
+				else isWrongCmd = 1;
+			}else isWrongCmd = 1;
+
+			//hasil pengecekan
+			if(isWrongCmd){
+				printf("\tWrong Command\n");
+			}else{
+				printf("\tDatabase : %s\n", database);
+			}
+		printf("\n");
+	}
+	else if(!strcmp(cmd, "DELETE")){
+		char *nxt_cmd = strtok(NULL, " ");
+		int isWhere = 0;
+		printf("\tCommand : %s\n", cmd);
+		if(!strcmp(nxt_cmd, "FROM")){
+			char *table, *nxt_cmd2, *col_value, *col_name;
+			table = trimString(strtok(NULL, " "));
+			if(strstr(table, ";")){
+				//delete table doang ga ada kondisi where
+				table = removeSemicolon(table);
+			}else{
+				nxt_cmd2 = trimString(strtok(NULL, " "));
+				if(!strcmp(nxt_cmd2, "WHERE")){
+					isWhere = 1;
+					col_name = trimString(strtok(NULL, "="));
+					col_value = trimString(strtok(NULL, " "));
+					
+					if(col_name && strstr(col_value, ";")){
+						col_value = removeSemicolon(col_value);
+					}else isWrongCmd = 1;
+					
+					col_value = removeStrQuotes(col_value);
+				}else isWrongCmd = 1;
+			}
+
+			//hasil pengecekan
+			if(isWrongCmd){
+				printf("\tWrong Command\n");
+			}else{
+				printf("\tTable : %s\n", table);
+				if(isWhere){
+					printf("\t\tColumn : %s\n", col_name);
+					printf("\t\tValue : %s\n", col_value);
+				}
+			}
+			printf("\n");
+		}
+	}
+	else if(!strcmp(cmd, "UPDATE")){
+		char *table = trimString(strtok(NULL, " "));
+		int isWhere = 0;
+		printf("\tCommand : %s\n", cmd);
+		if(table){
+			char *nxt_cmd = trimString(strtok(NULL, " "));
+			printf("\tQuery : %s\n", nxt_cmd);
+			char *nxt_cmd2, *col_value, *col_name, *col_value2, *col_name2;
+			//cek kalo format udah sesuai
+			if(!strcmp(nxt_cmd, "SET")){
+				col_name = trimString(strtok(NULL, "="));
+				if(col_name){ 
+					if(col_name){
+						col_value = trimString(strtok(NULL, " "));
+						if(strstr(col_value, ";")){
+							//update user  di sini yang tanpa kondisi
+							col_value = removeSemicolon(col_value);
+							col_value = removeStrQuotes(col_value);
+
+
+						}else{
+							nxt_cmd2 = trimString(strtok(NULL, " "));
+							if(nxt_cmd2 != NULL && !strcmp(nxt_cmd2, "WHERE")){
+								col_name2 = trimString(strtok(NULL, "="));
+								isWhere = 1;
+								if(col_name){
+									col_value2 = trimString(strtok(NULL, " "));
+									if(strstr(col_value2, ";")){
+										//update user disini yang ada kondisinya
+										col_value2 = removeSemicolon(col_value2);
+										col_value2 = removeStrQuotes(col_value);
+									}
+								}else isWrongCmd = 1;
+							}else isWrongCmd = 1;
+						}
+					}else isWrongCmd = 1;
+				}else isWrongCmd = 1;
+			}else isWrongCmd = 1;
+
+			//hasil pengecekan
+			if(isWrongCmd){
+				printf("\tWrong Command\n");
+			}else{
+				printf("\tTable : %s\n", table);
+				printf("\t\tColumn : %s\n", col_name);
+				printf("\t\tValue : %s\n", col_value);
+				if(isWhere){
+					printf("\t\t\tColumn2 : %s\n", col_name2);
+					printf("\t\t\tValue2 : %s\n", col_value2);
+				}
+			}
+			printf("\n");
+		}
+	}
+	else if(!strcmp(cmd, "INSERT")){
+		char *nxt_cmd = trimString(strtok(NULL, " "));
+		printf("\tCommand : %s\n", cmd);
+
+		if(!strcmp(nxt_cmd, "INTO")){
+			char *table_name = trimString(strtok(NULL, " "));
+			char *all_columns = trimString(getStrBetween(fullCommand, "(", ")"));
+			char *col_value;
+			if(all_columns && strstr(fullCommand, ";")){
+				printf("\tQuery : %s\n", nxt_cmd);
+				printf("\tTable Name : %s\n", table_name);
+				printf("\tALL COLUMN : %s\n", all_columns);
+				
+				col_value = strtok(all_columns, ",");
+				while(col_value){
+					//buat tabel berdasarkan kolom di sini
+					col_value = trimString(col_value);
+					col_value = removeStrQuotes(col_value);
+					printf("\t\tValue: %s\n", col_value);
+					col_value = trimString(strtok(NULL, ","));
+				}
+				printf("\n");
+			}else isWrongCmd = 1;
+		}else isWrongCmd = 1;
+
+		//hasil pengecekan
+		if(isWrongCmd){
+			printf("\tWrong Command\n");
+		}
+		printf("\n");
+	}
+	else if(!strcmp(cmd, "GRANT")){
+		char *nxt_cmd = trimString(strtok(NULL, " "));
+		char *username, *database,*nxt_cmd2, *nxt_cmd3;
+		printf("\tCommand : %s\n", cmd);
+
+		if(!strcmp(nxt_cmd, "PERMISSION")){
+			database = trimString(strtok(NULL, " "));
+			printf("\tQuery : %s\n", nxt_cmd);
+			//cek kalo format udah sesuai
+			if(database){
+				nxt_cmd2 = trimString(strtok(NULL, " "));
+				if(!strcmp(nxt_cmd2, "INTO")){ 
+					username = trimString(strtok(NULL, " "));
+					if(strstr(username, ";")){
+						//grant permissionnya di sini ya
+						username = removeSemicolon(username);
+
+					}else isWrongCmd = 1;
+				}else isWrongCmd = 1;
+			}else isWrongCmd = 1;
+		}else isWrongCmd = 1;
+		
+		//hasil pengecekan
+		if(isWrongCmd){
+			printf("\tWrong Command\n");
+		}else{
+			printf("\tDatabase : %s\n", database);
+			printf("\tUsername: %s\n", username);
+		}
+		printf("\n");
+	}
+	else if(!strcmp(cmd, "DROP")){
+		char *nxt_cmd = trimString(strtok(NULL, " "));
+		printf("\tCommand : %s\n", cmd);
+		printf("\tQuery : %s\n", nxt_cmd);
+
+		if(!strcmp(nxt_cmd, "TABLE")){
+			char *table = trimString(strtok(NULL, " "));
+			if(table){
+				if(strstr(table, ";")){
+					// drop tabel
+					table = removeSemicolon(table);
+				}
+				else isWrongCmd = 1;
+			}else isWrongCmd = 1;
+
+			//hasil pengecekan
+			if(!isWrongCmd){
+				printf("\tTable name : %s\n", table);
+			}
+		}
+		else if(!strcmp(nxt_cmd, "DATABASE")){
+			char *database = trimString(strtok(NULL, " "));
+			if(database){
+				if(strstr(database, ";")){
+					// drop database
+					database = removeSemicolon(database);
+				}
+				else isWrongCmd = 1;
+			}else isWrongCmd = 1;
+
+			//hasil pengecekan
+			if(!isWrongCmd){
+				printf("\tDatabase : %s\n", database);
+			}
+		}
+		else if(!strcmp(nxt_cmd, "COLUMN")){
+			char *col_name = trimString(strtok(NULL, " "));
+			if(col_name){
+				char *nxt_cmd2 = trimString(strtok(NULL, " "));
+				printf("\tQuery : %s\n", nxt_cmd);
+				char *table_name;
+				//cek kalo format udah sesuai
+				if(!strcmp(nxt_cmd2, "FROM")){
+					table_name = trimString(strtok(NULL, " "));
+					if(table_name){ 
+						if(strstr(table_name, ";")){
+							//ngapain di sini buat perintah
+							table_name = removeSemicolon(table_name);
+
+
+						}else isWrongCmd = 1;
+					}else isWrongCmd = 1;
+				}else isWrongCmd = 1;
+
+				//hasil pengecekan
+				if(!isWrongCmd){
+					printf("\tTable : %s\n", table_name);
+					printf("\t\tColumn : %s\n", col_name);
+				}
+			}
+		}else isWrongCmd = 1;
+
+		//hasil pengecekan
+		if(isWrongCmd){
+			printf("\tWrong Command\n\n");
+		}
+		printf("\n");
+	}
+
+	//yang select masih bug kalo format string tidak sesuai :(, kalo mau ngetes yang ini
+	//disesuaiin format yakkkkk
+	else if(!strcmp(cmd, "SELECT")){
+		char *all_column = getStrBetween(fullCommand, "SELECT ", "FROM");
+		char *table;
+		int isWhere = 0;
+		printf("\tCommand : %s\n", cmd);
+
+		if(all_column){
+			char *nxt_cmd = trimString(getStrBetween(fullCommand, all_column, " "));
+			printf("\tQuery : %s\n", nxt_cmd);
+			if(!strcmp(nxt_cmd, "FROM")){
+				if(!strcmp(all_column, "*")){
+					// select * noh from table
+					table = trimString(getStrBetween(fullCommand, "FROM ", ";"));
+					printf("\tAll column : %s\n", all_column);
+				}else if(all_column){
+					//ini loop kolom
+					table = trimString(getStrBetween(fullCommand, "FROM ", ";"));
+					printf("\tAll column : %s\n", all_column);
+					char *temp = trimString(strtok(all_column, ","));
+					while (temp != NULL){
+						printf("\t\tColumn : %s\n", temp);
+						temp = trimString(strtok(NULL, ","));
+					}
+				}else
+					isWrongCmd = 1;
+			}else
+				isWrongCmd = 1;
+			
+			//hasil pengecekan
+			if(isWrongCmd){
+				printf("\tWrong Command\n");
+			}else{
+				printf("\tTable name : %s\n", table);
+			}
+			printf("\n");
+		}
+	}
+	else printf("Wrong command\n");
 }
 
-int main(int argc, char* argv[])
-{
-    struct sockaddr_in address;
-    int sock = 0, valread;
-    struct sockaddr_in serv_addr;
-    char buffer[1024] = {0};
-    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-        printf("\n Socket creation error \n");
+int main (int argc, char* argv[]) {
+    struct sockaddr_in saddr;
+    int fd, ret_val;
+    struct hostent *local_host; /* need netdb.h for this */
+    char message[SIZE_BUF],  cmd[SIZE_BUF], id[SIZE_BUF], password[SIZE_BUF];
+	
+
+    /* Step1: create a TCP socket */
+    fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP); 
+    if (fd == -1) {
+        fprintf(stderr, "socket failed [%s]\n", hstrerror(errno));
         return -1;
     }
-  
-    memset(&serv_addr, '0', sizeof(serv_addr));
-  
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_port = htons(PORT);
-      
-    if(inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr)<=0) {
-        printf("\nInvalid address/ Address not supported \n");
-        return -1;
-    }
-  
-    if (connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
-        printf("\nConnection Failed \n");
+    printf("Created a socket with fd: %d\n", fd);
+
+    /* Let us initialize the server address structure */
+    saddr.sin_family = AF_INET;         
+    saddr.sin_port = htons(7000);     
+    local_host = gethostbyname("127.0.0.1");
+    saddr.sin_addr = *((struct in_addr *)local_host->h_addr);
+    /* Step2: connect to the TCP server socket */
+    ret_val = connect(fd, (struct sockaddr *)&saddr, sizeof(struct sockaddr_in));
+    if (ret_val == -1) {
+        fprintf(stderr, "connect failed [%s]\n", hstrerror(errno));
+        close(fd);
         return -1;
     }
 
-    bool command = false;
-    int status;
-    status=getuid();
-    while(true)
-    {
-        if(status==0)
-        {
-            // printf("ini root\n");
-            char *str=malloc(1024);
-            scanf("%[^\n]%*c",str);
-            read_cmd(str,true,sock);
-            free(str);
-        }
-        else{
-            // printf("ini bukan\n");
-            //username -> argv[2]
+    //TERIMA MSG SERVE / WAIT
+    ret_val = recv(fd, message, SIZE_BUF, 0);
+    // puts(message);
+    while(strcmp(message, "wait") == 0) {
+        printf("\e[31mServer is full!\e[0m\n");
+        ret_val = recv(fd, message, SIZE_BUF, 0);
+    }
+
+    int commandTrue = 0, isSuperUser = 0;
+    while(1) {
+        // sign up user
+        while(!commandTrue) {
+			if(!getuid()){
+				//super user
+				isSuperUser = 1;
+				commandTrue = 1;
+				sprintf(cmd, "%s", "login root");
+				register_login(fd, cmd, id, password, isSuperUser);
+				ret_val = send(fd, cmd, SIZE_BUF, 0);
+			}else{
+				//pengguna remeh temeh
+				sprintf(cmd, "%s", "login");
+				ret_val = send(fd, cmd, SIZE_BUF, 0);
+				if(!getIdPass(argc, argv, id, password)){
+					//salah format pas run file
+					printf("\nWrong argument!\n");
+					return 0;
+				} else if(!strcmp(cmd, "login")) {
+					//login biasa
+					if(register_login(fd, cmd, id, password, isSuperUser))
+						commandTrue = 1;
+					else
+						return 0;
+				} else {
+					//error handling, gatau, mager ganti kodingan yang lama nanti repot
+					//udah pake aja yang penting jalan asw
+					ret_val = recv(fd, message, SIZE_BUF, 0);
+					if(!strcmp(message, "notlogin\n")) {
+						printf("TOLONG REGISTER/ LOGIN DULU Y\n\n");
+						return 0;
+					} else {
+						commandTrue = 1;
+					}
+				}
+			}
 
         }
+
+        // other command
+        while(1){
+            printf("\e[32mInsert Command \n>\e[0m ");
+            scanf("%s", cmd);
+            ret_val = send(fd, cmd, SIZE_BUF, 0);
+			if(!strcmp(cmd, "see")){
+                see_books(fd);
+            }
+        }
+
+        sleep(2);
+        if(commandTrue) break;
     }
-}
+    printf("\e[31mKAMU KELUAR DARI BELENGGU CLIENT, BYE BYE!\e[0m\n\n");
+
+    /* Last step: close the socket */
+    close(fd);
+    return 0;
+} 
