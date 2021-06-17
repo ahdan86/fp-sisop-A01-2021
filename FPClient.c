@@ -147,11 +147,11 @@ char* removeSemicolon(char *str){
 	return str;
 }
 
-void read_cmd(char *command_cpy){
+void read_cmd(int fd, char *command_cpy){
 	char *fullCommand = trimString(command_cpy);
 	char command_temp[SIZE_BUF]; sprintf(command_temp, "%s", fullCommand);
 	char *cmd = trimString(strtok(command_temp, " "));
-	int isWrongCmd = 0;
+	int isWrongCmd = 0, retval;
 	printf("Command Inserted : %s\n", command_cpy);
 
 	if(!strcmp(cmd, "CREATE")){
@@ -159,6 +159,7 @@ void read_cmd(char *command_cpy){
 		char *nxt_cmd = trimString(strtok(NULL, " "));
 		printf("\tQuery : %s\n", nxt_cmd);
 
+		retval = send(fd, "create", SIZE_BUF, 0);
 		if(!strcmp(nxt_cmd, "USER")){
 			char *id = trimString(strtok(NULL, " "));
 			char *pass, *nxt_cmd2, *nxt_cmd3;
@@ -185,7 +186,9 @@ void read_cmd(char *command_cpy){
 				printf("\tWrong Command\n");
 			}else{
 				printf("\tUsername : %s\n", id);
+				retval = send(fd, id, SIZE_BUF, 0);
 				printf("\tPassword : %s\n", pass);
+				retval = send(fd, pass, SIZE_BUF, 0);
 			}
 			printf("\n");
 		}
@@ -593,11 +596,13 @@ int main (int argc, char* argv[]) {
         // other command
         while(1){
             printf("\e[32mInsert Command \n>\e[0m ");
-            scanf("%s", cmd);
-            ret_val = send(fd, cmd, SIZE_BUF, 0);
-			if(!strcmp(cmd, "see")){
-                see_books(fd);
-            }
+            // scanf("%s", cmd);
+			scanf("%[^\n]%*c",cmd);
+			read_cmd(fd,cmd);
+            // ret_val = send(fd, cmd, SIZE_BUF, 0);
+			// if(!strcmp(cmd, "see")){
+            //     see_books(fd);
+            // }
         }
 
         sleep(2);

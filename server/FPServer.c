@@ -13,6 +13,8 @@
 #define LOGIN_MESSAGE "Id and Password is sent\n"
 #define SIZE 1024
 
+char *path = "/home/ahdan/FP/fp2/server/AKUN/akun.txt";
+
 int create_tcp_server_socket() {
     struct sockaddr_in saddr;
     int fd, ret_val;
@@ -50,16 +52,18 @@ int create_tcp_server_socket() {
 
 int check_IdPassword(char id[], char password[], char cmd[]){
 	char line[512];
-	const char delim[2] = ":";
+	const char delim[5] = "[,]";
 	char *tempId, *tempPass;
-
-	FILE *fp = fopen("akun.txt", "r");
+	FILE *fp = fopen(path, "r");
 	while(fgets(line, 512, fp)){
 		char *newline = strchr( line, '\n' ); //getrid god dang newline
 		if ( newline )
 			*newline = 0;
 		tempId = strtok(line, delim);
 		tempPass = strtok(NULL, delim);
+
+        printf("check _id = %s %s\n",id,password);
+        printf("line = %s\n",line);
 
 		if(!strcmp(cmd, "register")){
 			if(!strcmp(tempId, id))
@@ -77,9 +81,22 @@ void register_login(int all_connections_i, char cmd[], char id[], char password[
                     int *userLoggedIn, int all_connections_serving ){
     int ret_val;
     int status_val;
-    if(!strcmp(cmd, "login")) {
-        ret_val = recv(all_connections_i, id, SIZE, 0);
-        ret_val = recv(all_connections_i, password, SIZE, 0);
+    if(!strcmp(cmd, "register")) {
+        if(check_IdPassword(id, password, cmd)) {
+            status_val = send(all_connections_serving,
+                    "userfound\n", SIZE, 0);
+        } else {
+            *userLoggedIn = 1;
+            FILE *app = fopen(path, "a+");
+            fprintf(app, "%s[,]%s\n", id, password);
+            printf("%s %s\n",id,password);
+            fclose(app);
+            status_val = send(all_connections_serving,
+                    "regloginsuccess\n", SIZE, 0);
+        }
+    }
+    else if(!strcmp(cmd, "login")) {
+        printf("LOGIN = %s %s\n",id,password);
         if(!check_IdPassword(id, password, cmd))
             status_val = send(all_connections_serving,
                     "wrongpass\n", SIZE, 0);
@@ -158,14 +175,10 @@ int main (int argc, char* argv[]) {
     int all_connections[MAX_CONNECTIONS];
     
     //make necessary files
-	if(access("akun.txt", F_OK ) != 0 ) {
-		FILE *fp = fopen("akun.txt", "w+");
+	if(access(path, F_OK ) != 0 ) {
+		FILE *fp = fopen(path, "w+");
 		fclose(fp);
 	} 
-    if(access("files.tsv", F_OK ) != 0 ) {
-		FILE *fp = fopen("files.tsv", "w+");
-		fclose(fp);
-	}
 
     /* Get the socket server fd */
     server_fd = create_tcp_server_socket(); 
@@ -256,9 +269,11 @@ int main (int argc, char* argv[]) {
                     } 
                     if (ret_val3 > 0) {
                         // signing up
-                        if(!strcmp(cmd, "login"))
+                        if(!strcmp(cmd, "login")){
+                              printf("receive = %s %s\n",id,password);
                               register_login(all_connections[i], cmd, id, password, &userLoggedIn, 
                                             all_connections[serving] );
+                        }
                         else if(!strcmp(cmd, "login root")){
                             // BUAT BEDAIN DIA MAKE ROOT ATAU NGGA MAKE VARIABEL 
                             //iSuperUser Y
@@ -274,10 +289,22 @@ int main (int argc, char* argv[]) {
 								//KALO MAU BUAT PERINTAH DISINI GES
                                 //INI DAH ADA CONTOH FUNGSI SEE 
                                 //KALO BINGUNG TANYA AJA Y
-
+                                
                                 //OTAK ATIK DI SINI 
-                                if(!strcmp(cmd, "see")){
-									see_books(all_connections[serving]);
+                                if(!strcmp(cmd, "create")){
+									// printf("masuk create\n");
+                                    int retval;
+                                    char temp1[SIZE];   
+                                    char temp2[SIZE];
+                                    retval = recv(all_connections[i],temp1,SIZE, 0);
+                                    printf("ID = %s\n",temp1);
+                                    retval = recv(all_connections[i],temp2,SIZE, 0);
+                                    printf("PASS = %s\n",temp2);
+
+                                   if(isSuperUser) register_login(all_connections[i], "register", temp1, temp2, &userLoggedIn, 
+                                            all_connections[serving] );
+                                    else
+                                        printf("BUKAN SUPERUSER\n");
                                 }
                                 
 
