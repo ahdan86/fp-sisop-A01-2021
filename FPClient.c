@@ -7,7 +7,8 @@
 #include <string.h>
 #include <ctype.h>
 
-#define SIZE_BUF 1024
+#define SIZE_BUF 100
+#define SIZE_CMD 512
 
 int register_login(int fd, char cmd[], char id[], char password[], int isSuperUser){
     int ret_val, isFound = 0;
@@ -147,20 +148,21 @@ char* removeSemicolon(char *str){
 	return str;
 }
 
-void read_cmd(int fd, char *command_cpy){
+void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 	char *fullCommand = trimString(command_cpy);
-	char command_temp[SIZE_BUF]; sprintf(command_temp, "%s", fullCommand);
+	char command_temp[SIZE_CMD]; sprintf(command_temp, "%s", fullCommand);
 	char *cmd = trimString(strtok(command_temp, " "));
-	int isWrongCmd = 0, retval;
+	int isWrongCmd = 0;
 	printf("Command Inserted : %s\n", command_cpy);
 
 	if(!strcmp(cmd, "CREATE")){
 		printf("\tCommand : %s\n", cmd);
 		char *nxt_cmd = trimString(strtok(NULL, " "));
 		printf("\tQuery : %s\n", nxt_cmd);
+		int ret_val = send(fd, "create", SIZE_BUF, 0);
 
-		retval = send(fd, "create", SIZE_BUF, 0);
 		if(!strcmp(nxt_cmd, "USER")){
+			ret_val = send(fd, "user", SIZE_BUF, 0);
 			char *id = trimString(strtok(NULL, " "));
 			char *pass, *nxt_cmd2, *nxt_cmd3;
 			//cek kalo format udah sesuai
@@ -174,8 +176,6 @@ void read_cmd(int fd, char *command_cpy){
 						if(strstr(pass, ";"))
 							pass = removeSemicolon(pass);
 						else isWrongCmd = 1;
-
-
 						
 					}else isWrongCmd = 1;
 				}else isWrongCmd = 1;
@@ -186,14 +186,18 @@ void read_cmd(int fd, char *command_cpy){
 				printf("\tWrong Command\n");
 			}else{
 				printf("\tUsername : %s\n", id);
-				retval = send(fd, id, SIZE_BUF, 0);
 				printf("\tPassword : %s\n", pass);
-				retval = send(fd, pass, SIZE_BUF, 0);
+				ret_val = send(fd, id, SIZE_BUF, 0);
+				ret_val = send(fd, pass, SIZE_BUF, 0);
 			}
+			char message[SIZE_BUF];
+			ret_val = recv(fd, message, SIZE_BUF, 0);
+			printf("%s", message);
 			printf("\n");
 		}
 		else if(!strcmp(nxt_cmd, "DATABASE")){
 			char *database = trimString(strtok(NULL, " "));
+			ret_val = send(fd, "database", SIZE_BUF, 0);
 			if(database){
 				if(strstr(database, ";")){
 					// bikin database
@@ -207,7 +211,13 @@ void read_cmd(int fd, char *command_cpy){
 				printf("\tWrong Command\n");
 			}else{
 				printf("\tDatabase : %s\n", database);
+				ret_val = send(fd, idNow, SIZE_BUF, 0);
+				ret_val = send(fd, passNow, SIZE_BUF, 0);
+				ret_val = send(fd, database, SIZE_BUF, 0);
 			}
+			char message[SIZE_BUF];
+			ret_val = recv(fd, message, SIZE_BUF, 0);
+			printf("%s", message);
 			printf("\n");
 		}
 		else if(!strcmp(nxt_cmd, "TABLE")){
@@ -379,6 +389,7 @@ void read_cmd(int fd, char *command_cpy){
 		char *nxt_cmd = trimString(strtok(NULL, " "));
 		char *username, *database,*nxt_cmd2, *nxt_cmd3;
 		printf("\tCommand : %s\n", cmd);
+		int ret_val = send(fd, "grant", SIZE_BUF, 0);
 
 		if(!strcmp(nxt_cmd, "PERMISSION")){
 			database = trimString(strtok(NULL, " "));
@@ -403,7 +414,12 @@ void read_cmd(int fd, char *command_cpy){
 		}else{
 			printf("\tDatabase : %s\n", database);
 			printf("\tUsername: %s\n", username);
+			ret_val = send(fd, database, SIZE_BUF, 0);
+			ret_val = send(fd, username, SIZE_BUF, 0);
 		}
+		char message[SIZE_BUF];
+		ret_val = recv(fd, message, SIZE_BUF, 0);
+		printf("%s", message);
 		printf("\n");
 	}
 	else if(!strcmp(cmd, "DROP")){
@@ -596,15 +612,9 @@ int main (int argc, char* argv[]) {
         // other command
         while(1){
             printf("\e[32mInsert Command \n>\e[0m ");
-            // scanf("%s", cmd);
 			scanf("%[^\n]%*c",cmd);
-			read_cmd(fd,cmd);
-            // ret_val = send(fd, cmd, SIZE_BUF, 0);
-			// if(!strcmp(cmd, "see")){
-            //     see_books(fd);
-            // }
-        }
-
+			read_cmd(fd,cmd, id, password);
+		}
         sleep(2);
         if(commandTrue) break;
     }
