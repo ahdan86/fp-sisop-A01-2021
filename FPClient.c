@@ -224,9 +224,13 @@ void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 			char *table_name = trimString(strtok(NULL, " "));
 			char *all_columns = trimString(getStrBetween(fullCommand, "(", ")"));
 			char *col_name, *col_type, *col_temp;
+			int ret_val = send(fd, "table", SIZE_BUF, 0);
+			ret_val = send(fd, table_name, SIZE_BUF, 0);
 			printf("\tTable Name : %s\n", table_name);
+
 			if(all_columns && strstr(fullCommand, ";")){
 				col_temp = strtok(all_columns, ",");	
+				char *message = "not done";
 				while(col_temp ){
 					//buat tabel berdasarkan kolom di sini
 					col_temp = trimString(col_temp);
@@ -234,18 +238,27 @@ void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 					col_type = trimString(getStrBetween(col_temp, col_name, NULL));
 					printf("\t\tName | Type : %s | %s\n", col_name, col_type);
 					col_temp = strtok(NULL, ",");
+
+					ret_val = send(fd, message, SIZE_BUF, 0);
+					ret_val = send(fd, col_name, SIZE_BUF, 0);
+					ret_val = send(fd, col_type, SIZE_BUF, 0);
 				}
+				ret_val = send(fd, "done", SIZE_BUF, 0);
 			}else isWrongCmd = 1;
 
 			//hasil pengecekan
 			if(isWrongCmd){
 				printf("\tWrong Command\n");
 			}
+			char message[SIZE_BUF];
+			ret_val = recv(fd, message, SIZE_BUF, 0);
+			printf("%s", message);
 			printf("\n");
 		}
 	}
 	else if(!strcmp(cmd, "USE")){
 		char *database = trimString(strtok(NULL, " "));
+		int ret_val = send(fd, "use", SIZE_BUF, 0);
 			if(database){
 				if(strstr(database, ";")){
 					// bikin database
@@ -259,7 +272,14 @@ void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 				printf("\tWrong Command\n");
 			}else{
 				printf("\tDatabase : %s\n", database);
+				ret_val = send(fd, database, SIZE_BUF, 0);
+				ret_val = send(fd, idNow, SIZE_BUF, 0);
+				ret_val = send(fd, passNow, SIZE_BUF, 0);
 			}
+			char message[SIZE_BUF];
+			int isPermitted;
+			ret_val = recv(fd, message, SIZE_BUF, 0);
+			printf("CWD is : %s\n", message);
 		printf("\n");
 	}
 	else if(!strcmp(cmd, "DELETE")){
@@ -357,11 +377,15 @@ void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 	else if(!strcmp(cmd, "INSERT")){
 		char *nxt_cmd = trimString(strtok(NULL, " "));
 		printf("\tCommand : %s\n", cmd);
+		int ret_val = send(fd, "insert", SIZE_BUF, 0);
 
 		if(!strcmp(nxt_cmd, "INTO")){
 			char *table_name = trimString(strtok(NULL, " "));
 			char *all_columns = trimString(getStrBetween(fullCommand, "(", ")"));
 			char *col_value;
+			char *message = "not done";
+			ret_val = send(fd, table_name, SIZE_BUF, 0);
+
 			if(all_columns && strstr(fullCommand, ";")){
 				printf("\tQuery : %s\n", nxt_cmd);
 				printf("\tTable Name : %s\n", table_name);
@@ -373,9 +397,12 @@ void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 					col_value = trimString(col_value);
 					col_value = removeStrQuotes(col_value);
 					printf("\t\tValue: %s\n", col_value);
+					ret_val = send(fd, message, SIZE_BUF, 0);
+					ret_val = send(fd, col_value, SIZE_BUF, 0);
+
 					col_value = trimString(strtok(NULL, ","));
 				}
-				printf("\n");
+				ret_val = send(fd, "done", SIZE_BUF, 0);
 			}else isWrongCmd = 1;
 		}else isWrongCmd = 1;
 
@@ -383,6 +410,9 @@ void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 		if(isWrongCmd){
 			printf("\tWrong Command\n");
 		}
+		char message[SIZE_BUF];
+		ret_val = recv(fd, message, SIZE_BUF, 0);
+		printf("%s", message);
 		printf("\n");
 	}
 	else if(!strcmp(cmd, "GRANT")){
@@ -426,6 +456,7 @@ void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 		char *nxt_cmd = trimString(strtok(NULL, " "));
 		printf("\tCommand : %s\n", cmd);
 		printf("\tQuery : %s\n", nxt_cmd);
+		int ret_val = send(fd, "drop", SIZE_BUF, 0);
 
 		if(!strcmp(nxt_cmd, "TABLE")){
 			char *table = trimString(strtok(NULL, " "));
