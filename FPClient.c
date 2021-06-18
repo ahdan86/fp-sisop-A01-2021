@@ -493,8 +493,14 @@ void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 			//hasil pengecekan
 			if(!isWrongCmd){
 				printf("\tDatabase : %s\n", database);
+				int retvalID =send(fd, idNow, SIZE_BUF, 0);
+				int retvalPass = send(fd, passNow, SIZE_BUF, 0);
 				int retvalDB = send(fd, database, SIZE_BUF, 0);
 			}
+			char message[SIZE_BUF];
+			ret_val = recv(fd, message, SIZE_BUF, 0);
+			printf("%s", message);
+			printf("\n");
 		}
 		else if(!strcmp(nxt_cmd, "COLUMN")){
 			char *col_name = trimString(strtok(NULL, " "));

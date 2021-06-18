@@ -349,6 +349,81 @@ void dropTable(int all_connections_i, int isSuperUser){
     }
 }
 
+int deleteTxt(char filename[])
+{
+    char temp1[SIZE];
+    strcpy(temp1, "/home/ahdan/FP/fp2/server/USER/");
+    strcat(temp1, "temp.txt");
+    FILE *tsv = fopen(path, "r+");
+    FILE *tmp = fopen(temp1, "w+");
+    char temp[256], line[256];
+
+	while(fgets(line, 256, tsv) != 0){
+        if(sscanf(line, "%255[^\n]", temp) != 1) 
+			break;
+        if(strstr(temp, filename) == 0) 
+            fprintf(tmp, "%s\n", temp);
+    }
+
+    while(fgets(line, 256, tsv) != 0){
+        if(sscanf(line, "%255[^\n]", temp) != 1) break;
+        fprintf(tsv, "%s\n", temp);
+    }
+    remove(path);
+    rename(temp1, path);
+
+    fclose(tmp);
+    fclose(tsv);
+    return 0;  
+}
+
+void dropDB(int all_connections_i, int isSuperUser){
+    int flag = 0;
+    char database[SIZE];
+    char idNow[SIZE];
+    char passNow[SIZE];
+    int retvalDB = recv(all_connections_i, database, SIZE, 0);
+    int retvalId = recv(all_connections_i, idNow, SIZE, 0);
+    int retvalPass = recv(all_connections_i, passNow, SIZE, 0);
+
+    if(!check_IdPassDatabase(idNow,passNow,database) && !isSuperUser)
+    {
+        int retvalMsg = send(all_connections_i, "Tidak ada permission\n", SIZE, 0);
+        return;
+    }
+    else{
+        char temp[SIZE];
+        strcpy(temp, path_mk_database);
+        strcat(temp, database);
+        int flag=0;
+        DIR *d;
+        struct dirent *dir;
+        d = opendir(path_mk_database);
+        while ((dir = readdir(d)) != NULL)
+        {
+            if(dir->d_type==DT_DIR)
+            {
+                if(!strcmp(dir->d_name, database))
+                {
+                    flag=1;
+                    printf("DB to Drop = %s\n",temp);
+                    remove(temp);
+                    break;
+                }
+            }
+        }
+
+        int check = deleteTxt(database);
+    }
+    if(flag == 1)
+    {
+        int retval2=send(all_connections_i, "DROP DB Success\n", SIZE, 0);
+    }
+    else{
+        int retval2=send(all_connections_i, "DB Not Found!\n", SIZE, 0);
+    }
+}
+
 void insert(int all_connections_i, int isSuperUser){
     char table[SIZE], col_value[SIZE], message[SIZE], tempMkTable[512];
     int ret_val;
@@ -525,10 +600,10 @@ int main (int argc, char* argv[]) {
                                     {
                                         dropTable(all_connections[serving], isSuperUser);
                                     }
-                                    // else if( !strcmp(cmdLanjut,"database"))
-                                    // {
-                                    //     // dropDB(all_connections[serving], isSuperUser);
-                                    // }
+                                    else if( !strcmp(cmdLanjut,"database"))
+                                    {
+                                        dropDB(all_connections[serving], isSuperUser);
+                                    }
                                 }
 
                             } else {
