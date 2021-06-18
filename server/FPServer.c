@@ -349,6 +349,92 @@ void dropTable(int all_connections_i, int isSuperUser){
     }
 }
 
+void dropColumn(int all_connections_i, int isSuperUser)
+{
+    int tag=0;
+    char table[SIZE];
+    char column[SIZE];
+    char temp[SIZE];
+    char temp1[SIZE];
+    printf("cwd = %s\n",cwd);
+    strcpy(temp,cwd);
+    strcpy(temp1,cwd);
+    if(!strcmp(cwd,"/home/ahdan/FP/fp2/server/databases/"))
+    {
+        int retvalFailed = send(all_connections_i, "Belum ada DB yang di USE\n", SIZE, 0);
+        return;
+    }
+    strcat(temp,table);
+    strcat(temp1,"temp");
+    int retvalTable = recv(all_connections_i, table, SIZE, 0);
+    int retvalColumn = recv(all_connections_i, column, SIZE, 0);
+    
+    FILE *tableChoose = fopen(temp, "r+");
+    FILE *temp2 = fopen(temp1,"w+");
+    char line[252], *temp3;
+    char temp4[252];
+    int i=1;
+    while(fgets(line, 252, tableChoose)!=0)
+    {
+        if(strstr(line, column))
+        {
+            temp3 = strtok(line, "[,]");
+            if(strstr(temp3,column))
+            {
+                tag=1;
+                break;
+            }
+            while(temp3!=NULL){
+                printf("%s\n",temp3);
+                temp3 = strtok(NULL, "[,]");
+                if(strstr(temp3,column))
+                {
+                    printf("%s\n",temp3);
+                    i++;
+                    tag=1;
+                    break;
+                }
+                i++;
+            }
+            printf("i = %d\n",i);
+        }
+    }
+    if(tag==0)
+    {
+        int retvalMSG=send(all_connections_i,"Tidak ada column ditemukan",SIZE, 0);
+        return;
+    }
+    rewind(tableChoose);
+    while(fgets(temp4, 252, tableChoose)!=0)
+    {
+        char *newline = strchr(temp4,'\n');
+        if(newline)
+            *newline=0;
+        int j=1;
+        temp3 = strtok(temp1, "[,]");
+        char *delimit = "[,]";
+        printf("temp3 = %s\n",temp3);
+        while(temp3 != NULL)
+        {
+            if(j!=i)
+            {
+                printf("temp3 = %s\n",temp3);
+                fprintf(temp2,"%s%s", temp3, delimit);
+                temp3 = strtok(NULL, "[,]");
+            }
+            else{
+                temp3 = strtok(NULL, "[,]");
+            }
+            j++;
+        }
+        fprintf(temp2,"\n");
+    }
+
+    fclose(tableChoose);
+    fclose(temp2);
+    int retvalMsg = send(all_connections_i,"Column berhasil di drop",SIZE,0);
+}
+
 int deleteTxt(char filename[])
 {
     char temp1[SIZE];
@@ -603,6 +689,10 @@ int main (int argc, char* argv[]) {
                                     else if( !strcmp(cmdLanjut,"database"))
                                     {
                                         dropDB(all_connections[serving], isSuperUser);
+                                    }
+                                    else if( !strcmp(cmdLanjut,"column"))
+                                    {
+                                        dropColumn(all_connections[serving], isSuperUser);
                                     }
                                 }
 

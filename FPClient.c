@@ -503,6 +503,7 @@ void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 			printf("\n");
 		}
 		else if(!strcmp(nxt_cmd, "COLUMN")){
+			int retvalTable = send(fd, "column", SIZE_BUF, 0);
 			char *col_name = trimString(strtok(NULL, " "));
 			if(col_name){
 				char *nxt_cmd2 = trimString(strtok(NULL, " "));
@@ -524,8 +525,14 @@ void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 				//hasil pengecekan
 				if(!isWrongCmd){
 					printf("\tTable : %s\n", table_name);
+					int retValTable = send(fd, table_name, SIZE_BUF, 0);
 					printf("\t\tColumn : %s\n", col_name);
+					int retValColumn = send(fd, col_name, SIZE_BUF, 0);
 				}
+				char message[SIZE_BUF];
+				ret_val = recv(fd, message, SIZE_BUF, 0);
+				printf("%s", message);
+				printf("\n");
 			}
 		}else isWrongCmd = 1;
 
