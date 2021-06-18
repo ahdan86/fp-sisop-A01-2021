@@ -308,7 +308,7 @@ void dropTable(int all_connections_i, int isSuperUser){
     char table[SIZE];
     char temp[SIZE];
     printf("drop cwd = %s\n",cwd);
-    if(!strcmp(cwd,"/home/ahdan/FP/fp2/server/databases/"))
+    if(!strcmp(cwd,NULL))
     {
         int retvalFailed = send(all_connections_i, "Belum ada DB yang di USE\n", SIZE, 0);
         return;
@@ -351,23 +351,35 @@ void dropTable(int all_connections_i, int isSuperUser){
 
 void dropColumn(int all_connections_i, int isSuperUser)
 {
+    printf("CWD = %s\n", cwd);
+    printf("strlen CWD = %d\n", strlen(cwd));
+    if(strlen(cwd)==0)
+    {
+        int retvalFailed = send(all_connections_i, "Belum ada DB yang di USE\n", SIZE, 0);
+        return;
+    }
     int tag=0;
     char table[SIZE];
     char column[SIZE];
     char temp[SIZE];
     char temp1[SIZE];
-    printf("cwd = %s\n",cwd);
     strcpy(temp,cwd);
     strcpy(temp1,cwd);
-    if(!strcmp(cwd,"/home/ahdan/FP/fp2/server/databases/"))
-    {
-        int retvalFailed = send(all_connections_i, "Belum ada DB yang di USE\n", SIZE, 0);
-        return;
-    }
-    strcat(temp,table);
-    strcat(temp1,"temp");
+    
     int retvalTable = recv(all_connections_i, table, SIZE, 0);
     int retvalColumn = recv(all_connections_i, column, SIZE, 0);
+
+    printf("KOLOM = %s\n",column);
+    printf("TABLE = %s\n",table);
+    
+    strcat(temp,"/");
+    strcat(temp1,"/");
+    
+    strcat(temp,table);
+    strcat(temp1,"temp");
+
+    printf("%s\n",temp);
+    printf("%s\n",temp1);
     
     FILE *tableChoose = fopen(temp, "r+");
     FILE *temp2 = fopen(temp1,"w+");
@@ -411,11 +423,12 @@ void dropColumn(int all_connections_i, int isSuperUser)
         if(newline)
             *newline=0;
         int j=1;
-        temp3 = strtok(temp1, "[,]");
+        temp3 = strtok(temp4, "[,]");
         char *delimit = "[,]";
-        printf("temp3 = %s\n",temp3);
+        // printf("temp3 = %s\n",temp3);
         while(temp3 != NULL)
         {
+            printf("j = %d\n",j);
             if(j!=i)
             {
                 printf("temp3 = %s\n",temp3);
@@ -429,7 +442,8 @@ void dropColumn(int all_connections_i, int isSuperUser)
         }
         fprintf(temp2,"\n");
     }
-
+    remove(temp);
+    rename(temp1, temp);
     fclose(tableChoose);
     fclose(temp2);
     int retvalMsg = send(all_connections_i,"Column berhasil di drop",SIZE,0);
@@ -547,14 +561,14 @@ int main (int argc, char* argv[]) {
 		FILE *fp = fopen(path, "w+");
 		fclose(fp);
 	} 
-    if(access("files.tsv", F_OK ) != 0 ) {
-		FILE *fp = fopen("files.tsv", "w+");
-		fclose(fp);
-	}
-	if(access("running.log", F_OK ) != 0 ) {
-		FILE *fp = fopen("running.log", "w+");
-		fclose(fp);
-	} 
+    // if(access("files.tsv", F_OK ) != 0 ) {
+	// 	FILE *fp = fopen("files.tsv", "w+");
+	// 	fclose(fp);
+	// }
+	// if(access("running.log", F_OK ) != 0 ) {
+	// 	FILE *fp = fopen("running.log", "w+");
+	// 	fclose(fp);
+	// } 
     /* Get the socket server fd */
     server_fd = create_tcp_server_socket(); 
     if (server_fd == -1) {
