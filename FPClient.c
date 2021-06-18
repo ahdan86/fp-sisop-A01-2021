@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <ctype.h>
+#include <time.h>
 
 #define SIZE_BUF 100
 #define SIZE_CMD 512
@@ -148,7 +149,29 @@ char* removeSemicolon(char *str){
 	return str;
 }
 
+void logging(char id[],char *cmd)
+{
+	int hours, minutes, seconds, day, month, year;
+	time_t t;
+    time(&t);
+	struct tm *local = localtime(&t);
+
+	hours = local->tm_hour;         
+    minutes = local->tm_min;        
+    seconds = local->tm_sec;
+
+	day = local->tm_mday;       
+    month = local->tm_mon + 1;
+    year = local->tm_year + 1900; 
+	
+	FILE *fp = fopen("log.txt","a+");
+	fprintf(fp, "%d/%02d/%02d %02d:%02d:%02d:%s:%s\n", year, month, day, hours, minutes, seconds, id, cmd);
+	fclose(fp);
+	return;
+}
+
 void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
+	logging(idNow,command_cpy);
 	char *fullCommand = trimString(command_cpy);
 	char command_temp[SIZE_CMD]; sprintf(command_temp, "%s", fullCommand);
 	char *cmd = trimString(strtok(command_temp, " "));
