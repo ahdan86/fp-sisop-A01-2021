@@ -16,6 +16,7 @@
 
 char *path = "/home/erki/Documents/fp/databaseku/USER/akun.txt";
 char *path_mk_database = "/home/erki/Documents/fp/databaseku/";
+char cwd[256];
 
 int create_tcp_server_socket() {
     struct sockaddr_in saddr;
@@ -220,6 +221,26 @@ void create(int all_connections_i, int isSuperUser){
         fprintf(app, "%s[,]%s[,]%s[,]\n", id, pass, database);
         fclose(app);
         ret_val = send(all_connections_i, "database created!\n", SIZE, 0);
+    } else if(!strcmp(query, "table")){
+        char table[SIZE], col_name[SIZE], col_type[SIZE], message[SIZE], tempMkTable[512];
+        int ret_val;
+        ret_val = recv(all_connections_i, table, SIZE, 0);
+        sprintf(tempMkTable, "%s/%s", cwd, table);
+        printf("table %s\n", tempMkTable);
+        FILE *fp = fopen(tempMkTable, "w+");
+
+        while(1){
+            ret_val = recv(all_connections_i, message, SIZE, 0);
+            if(!strcmp(message, "done"))
+                break;
+            ret_val = recv(all_connections_i, col_name, SIZE, 0);
+            ret_val = recv(all_connections_i, col_type, SIZE, 0);
+            printf("DEBUG --- %s : %s %s\n", message, col_type, col_name);
+            fprintf(fp, "%s %s[,]", col_name, col_type);
+        }
+        fprintf(fp, "\n");
+        fclose(fp);
+        ret_val = send(all_connections_i, "Table created!\n", SIZE, 0);
     }
 }
 
@@ -256,6 +277,52 @@ void grant(int all_connectionss_i, int isSuperUser){
 
     }else
        ret_val = send(all_connectionss_i, "Permission not granted(not root user)\n", SIZE, 0);  
+}
+
+void use(int all_connections_i, int isSuperUser){
+    char id[SIZE], pass[SIZE], database[SIZE];
+    int ret_val, isPermitted = 0;
+
+    ret_val = recv(all_connections_i, database, SIZE, 0);
+    ret_val = recv(all_connections_i, id, SIZE, 0);
+    ret_val = recv(all_connections_i, pass, SIZE, 0);
+
+    // printf("debug -> %s %s %s\n", id, pass, database);
+    if(!isSuperUser){
+        if(check_IdPassDatabase(id, pass, database)){
+            sprintf(cwd, "%s%s", path_mk_database, database);
+            isPermitted = 1;
+        }
+    }else{
+        isPermitted = 1;
+        sprintf(cwd, "%s%s", path_mk_database, database);
+    }
+    printf("CWD --- %s\n", cwd);
+    if(isPermitted)
+        ret_val = send(all_connections_i, cwd, SIZE, 0);
+    else
+        ret_val = send(all_connections_i, "Permission is not found\n", SIZE, 0);
+}
+
+void insert(int all_connections_i, int isSuperUser){
+    char table[SIZE], col_value[SIZE], message[SIZE], tempMkTable[512];
+    int ret_val;
+    ret_val = recv(all_connections_i, table, SIZE, 0);
+    sprintf(tempMkTable, "%s/%s", cwd, table);
+    printf("table %s\n", tempMkTable);
+    FILE *fp = fopen(tempMkTable, "a+");
+
+    while(1){
+        ret_val = recv(all_connections_i, message, SIZE, 0);
+        if(!strcmp(message, "done"))
+            break;
+        ret_val = recv(all_connections_i, col_value, SIZE, 0);
+        printf("DEBUG --- %s : %s\n", message, col_value);
+        fprintf(fp, "%s[,]", col_value);
+    }
+    fprintf(fp, "\n");
+    fclose(fp);
+    ret_val = send(all_connections_i, "Table inserted!\n", SIZE, 0);
 }
 
 int main (int argc, char* argv[]) {
@@ -397,7 +464,17 @@ int main (int argc, char* argv[]) {
                                 else if(!strcmp(cmd, "grant")){
 									grant(all_connections[serving], isSuperUser);
                                 }
-                                
+                                //use command
+                                else if(!strcmp(cmd, "use")){
+                                    use(all_connections[serving], isSuperUser);
+                                }
+                                //insert command
+                                else if(!strcmp(cmd, "insert")){
+                                    insert(all_connections[serving], isSuperUser);
+                                }
+                                else if(!strcmp(cmd, "drop")){
+                                    drop(all_connections[serving], isSuperUser);
+                                }
 
                             } else {
 								//user not login
