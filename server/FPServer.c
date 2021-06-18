@@ -14,8 +14,8 @@
 #define LOGIN_MESSAGE "Id and Password is sent\n"
 #define SIZE 100
 
-char *path = "/home/erki/Documents/fp/databaseku/USER/akun.txt";
-char *path_mk_database = "/home/erki/Documents/fp/databaseku/";
+char *path = "/home/ahdan/FP/fp2/server/USER/akun.txt";
+char *path_mk_database = "/home/ahdan/FP/fp2/server/databases/";
 char cwd[256];
 
 int create_tcp_server_socket() {
@@ -304,6 +304,51 @@ void use(int all_connections_i, int isSuperUser){
         ret_val = send(all_connections_i, "Permission is not found\n", SIZE, 0);
 }
 
+void dropTable(int all_connections_i, int isSuperUser){
+    char table[SIZE];
+    char temp[SIZE];
+    printf("drop cwd = %s\n",cwd);
+    if(!strcmp(cwd,"/home/ahdan/FP/fp2/server/databases/"))
+    {
+        int retvalFailed = send(all_connections_i, "Belum ada DB yang di USE\n", SIZE, 0);
+        return;
+    }
+    strcpy(temp, cwd);
+    int flag =0;
+    int retval = recv(all_connections_i, table, SIZE, 0);
+    printf("drop table = %s\n",table);
+    DIR *d;
+    struct dirent *dir;
+    d = opendir(cwd);
+    if(d)
+    {
+        while ((dir = readdir(d)) != NULL)
+        {
+            if(!strcmp(dir->d_name,".")||!strcmp(dir->d_name,".."))
+            {
+                continue;
+            }
+
+            else if(!strcmp(dir->d_name,table))
+            {
+                flag = 1;
+                strcat(temp,"/");
+                strcat(temp,dir->d_name);
+                printf("Tabel to Drop = %s\n",temp);
+                remove(temp);
+                break;
+            }
+        }
+    }
+    if(flag == 1)
+    {
+        int retval2=send(all_connections_i, "DROP Table Success\n", SIZE, 0);
+    }
+    else{
+        int retval2=send(all_connections_i, "Table Not Found!\n", SIZE, 0);
+    }
+}
+
 void insert(int all_connections_i, int isSuperUser){
     char table[SIZE], col_value[SIZE], message[SIZE], tempMkTable[512];
     int ret_val;
@@ -324,6 +369,7 @@ void insert(int all_connections_i, int isSuperUser){
     fclose(fp);
     ret_val = send(all_connections_i, "Table inserted!\n", SIZE, 0);
 }
+
 
 int main (int argc, char* argv[]) {
     fd_set read_fd_set;
@@ -473,7 +519,16 @@ int main (int argc, char* argv[]) {
                                     insert(all_connections[serving], isSuperUser);
                                 }
                                 else if(!strcmp(cmd, "drop")){
-                                    drop(all_connections[serving], isSuperUser);
+                                    char cmdLanjut[SIZE];
+                                    int retvalDrop = recv(all_connections[serving],cmdLanjut, SIZE, 0);
+                                    if(!strcmp(cmdLanjut,"table"))
+                                    {
+                                        dropTable(all_connections[serving], isSuperUser);
+                                    }
+                                    // else if( !strcmp(cmdLanjut,"database"))
+                                    // {
+                                    //     // dropDB(all_connections[serving], isSuperUser);
+                                    // }
                                 }
 
                             } else {

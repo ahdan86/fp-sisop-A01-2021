@@ -459,6 +459,7 @@ void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 		int ret_val = send(fd, "drop", SIZE_BUF, 0);
 
 		if(!strcmp(nxt_cmd, "TABLE")){
+			int retvalTable = send(fd, "table", SIZE_BUF, 0);
 			char *table = trimString(strtok(NULL, " "));
 			if(table){
 				if(strstr(table, ";")){
@@ -471,9 +472,15 @@ void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 			//hasil pengecekan
 			if(!isWrongCmd){
 				printf("\tTable name : %s\n", table);
+				int retvalTable = send(fd, table, SIZE_BUF, 0);
 			}
+			char message[SIZE_BUF];
+			ret_val = recv(fd, message, SIZE_BUF, 0);
+			printf("%s", message);
+			printf("\n");
 		}
 		else if(!strcmp(nxt_cmd, "DATABASE")){
+			int retvalTable = send(fd, "database", SIZE_BUF, 0);
 			char *database = trimString(strtok(NULL, " "));
 			if(database){
 				if(strstr(database, ";")){
@@ -486,6 +493,7 @@ void read_cmd(int fd, char *command_cpy, char idNow[], char passNow[]){
 			//hasil pengecekan
 			if(!isWrongCmd){
 				printf("\tDatabase : %s\n", database);
+				int retvalDB = send(fd, database, SIZE_BUF, 0);
 			}
 		}
 		else if(!strcmp(nxt_cmd, "COLUMN")){
