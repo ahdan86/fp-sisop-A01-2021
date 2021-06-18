@@ -6,14 +6,16 @@
 #include <sys/time.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 #define DATA_BUFFER 50
 #define MAX_CONNECTIONS 10 
 #define SUCCESS_MESSAGE "Your message delivered successfully"
 #define LOGIN_MESSAGE "Id and Password is sent\n"
-#define SIZE 1024
+#define SIZE 100
 
-char *path = "/home/ahdan/FP/fp2/server/AKUN/akun.txt";
+char *path = "/home/erki/Documents/fp/databaseku/USER/akun.txt";
+char *path_mk_database = "/home/erki/Documents/fp/databaseku/";
 
 int create_tcp_server_socket() {
     struct sockaddr_in saddr;
@@ -50,10 +52,36 @@ int create_tcp_server_socket() {
     return fd;
 }
 
+int check_IdPassDatabase(char id[], char pass[], char database[]){
+    char line[512];
+    const char delim[5] = "[,]";
+	char *tempId, *tempPass, *tempDatabase;
+
+    FILE *fp = fopen(path, "r");
+	while(fgets(line, 512, fp)){
+		char *newline = strchr( line, '\n' ); //getrid god dang newline
+		if ( newline )
+			*newline = 0;
+		tempId = strtok(line, delim);
+		tempPass = strtok(NULL, delim);
+        tempDatabase = strtok(NULL, delim);
+
+        if(tempDatabase){
+            if(!strcmp(tempId, id) && !strcmp(tempPass, pass) && !strcmp(tempDatabase, database)){
+                return 1;
+            }
+        }
+		
+	}
+	fclose(fp);
+	return 0;
+}
+
 int check_IdPassword(char id[], char password[], char cmd[]){
 	char line[512];
 	const char delim[5] = "[,]";
 	char *tempId, *tempPass;
+
 	FILE *fp = fopen(path, "r");
 	while(fgets(line, 512, fp)){
 		char *newline = strchr( line, '\n' ); //getrid god dang newline
@@ -61,9 +89,6 @@ int check_IdPassword(char id[], char password[], char cmd[]){
 			*newline = 0;
 		tempId = strtok(line, delim);
 		tempPass = strtok(NULL, delim);
-
-        printf("check _id = %s %s\n",id,password);
-        printf("line = %s\n",line);
 
 		if(!strcmp(cmd, "register")){
 			if(!strcmp(tempId, id))
@@ -82,21 +107,22 @@ void register_login(int all_connections_i, char cmd[], char id[], char password[
     int ret_val;
     int status_val;
     if(!strcmp(cmd, "register")) {
+        ret_val = recv(all_connections_i, id, SIZE, 0);
+        ret_val = recv(all_connections_i, password, SIZE, 0);
         if(check_IdPassword(id, password, cmd)) {
             status_val = send(all_connections_serving,
                     "userfound\n", SIZE, 0);
         } else {
             *userLoggedIn = 1;
             FILE *app = fopen(path, "a+");
-            fprintf(app, "%s[,]%s\n", id, password);
-            printf("%s %s\n",id,password);
+            fprintf(app, "%s[,]%s[,]\n", id, password);
             fclose(app);
             status_val = send(all_connections_serving,
                     "regloginsuccess\n", SIZE, 0);
         }
-    }
-    else if(!strcmp(cmd, "login")) {
-        printf("LOGIN = %s %s\n",id,password);
+    }else if(!strcmp(cmd, "login")) {
+        ret_val = recv(all_connections_i, id, SIZE, 0);
+        ret_val = recv(all_connections_i, password, SIZE, 0);
         if(!check_IdPassword(id, password, cmd))
             status_val = send(all_connections_serving,
                     "wrongpass\n", SIZE, 0);
@@ -164,10 +190,78 @@ void see_books(int rcv_clt){
 	// status_val = send(rcv_clt, "done", SIZE, 0);
 }
 
+void create(int all_connections_i, int isSuperUser){
+    char query[SIZE];
+    int ret_val = recv(all_connections_i, query, SIZE, 0);
+    // printf("query %s\n", query);
+    
+    if(!strcmp(query, "user")){
+        char id[SIZE], pass[SIZE];
+        ret_val = recv(all_connections_i, id, SIZE, 0);
+        ret_val = recv(all_connections_i, pass, SIZE, 0);
+        printf("%s -> %s %s\n", query, id, pass);
+        if(isSuperUser){
+            FILE *app = fopen(path, "a+");
+            fprintf(app, "%s[,]%s[,]\n", id, pass);
+            fclose(app);
+            ret_val = send(all_connections_i, "user created\n", SIZE, 0);
+        }else
+            ret_val = send(all_connections_i, "you are not root user\n", SIZE, 0);
+        
+    } else if(!strcmp(query, "database")){
+        char database[SIZE], id[SIZE], pass[SIZE], temp[SIZE];
+        int ret_val;
+        ret_val = recv(all_connections_i, id, SIZE, 0);
+        ret_val = recv(all_connections_i, pass, SIZE, 0);
+        ret_val = recv(all_connections_i, database, SIZE, 0);
+        sprintf(temp, "%s%s", path_mk_database, database);
+        mkdir(temp, 0777);
+        FILE *app = fopen(path, "a+");
+        fprintf(app, "%s[,]%s[,]%s[,]\n", id, pass, database);
+        fclose(app);
+        ret_val = send(all_connections_i, "database created!\n", SIZE, 0);
+    }
+}
+
+void grant(int all_connectionss_i, int isSuperUser){
+    char database[SIZE], username[SIZE], line[512];
+    int ret_val, isFound = 0;
+    const char delim[5] = "[,]";
+    char *tempId, *tempPass;
+
+    ret_val = recv(all_connectionss_i, database, SIZE, 0);
+    ret_val = recv(all_connectionss_i, username, SIZE, 0);
+
+    if(isSuperUser){
+        FILE *fp = fopen(path, "a+");
+        while(fgets(line, 512, fp)){
+            char *newline = strchr( line, '\n' ); //getrid god dang newline
+            if ( newline )
+                *newline = 0;
+            if(strstr(line, username)){
+                isFound = 1;
+                tempId = strtok(line, delim);
+                tempPass = strtok(NULL, delim);
+                if(!check_IdPassDatabase(tempId, tempPass, database)){
+                    fprintf(fp,"%s[,]%s[,]%s[,]\n", tempId, tempPass, database);
+                }else
+                    break;
+            }
+        }
+	    fclose(fp);
+        if(!isFound)
+            ret_val = send(all_connectionss_i, "Permission not granted(not found)\n", SIZE, 0);
+        else
+            ret_val = send(all_connectionss_i, "Permission granted\n", SIZE, 0);
+
+    }else
+       ret_val = send(all_connectionss_i, "Permission not granted(not root user)\n", SIZE, 0);  
+}
+
 int main (int argc, char* argv[]) {
     fd_set read_fd_set;
     struct sockaddr_in new_addr;
-    int server_fd, new_fd, i, serving = 1, isSuperUser = 1;;
+    int server_fd, new_fd, i, serving = 1, isSuperUser = 0;
     int ret_val, ret_val1, ret_val2, ret_val3, ret_val4, status_val;
     char message[SIZE], id[SIZE], password[SIZE], cmd[SIZE];
     socklen_t addrlen;
@@ -179,7 +273,14 @@ int main (int argc, char* argv[]) {
 		FILE *fp = fopen(path, "w+");
 		fclose(fp);
 	} 
-
+    if(access("files.tsv", F_OK ) != 0 ) {
+		FILE *fp = fopen("files.tsv", "w+");
+		fclose(fp);
+	}
+	if(access("running.log", F_OK ) != 0 ) {
+		FILE *fp = fopen("running.log", "w+");
+		fclose(fp);
+	} 
     /* Get the socket server fd */
     server_fd = create_tcp_server_socket(); 
     if (server_fd == -1) {
@@ -269,11 +370,9 @@ int main (int argc, char* argv[]) {
                     } 
                     if (ret_val3 > 0) {
                         // signing up
-                        if(!strcmp(cmd, "login")){
-                              printf("receive = %s %s\n",id,password);
+                        if(!strcmp(cmd, "login"))
                               register_login(all_connections[i], cmd, id, password, &userLoggedIn, 
                                             all_connections[serving] );
-                        }
                         else if(!strcmp(cmd, "login root")){
                             // BUAT BEDAIN DIA MAKE ROOT ATAU NGGA MAKE VARIABEL 
                             //iSuperUser Y
@@ -289,22 +388,14 @@ int main (int argc, char* argv[]) {
 								//KALO MAU BUAT PERINTAH DISINI GES
                                 //INI DAH ADA CONTOH FUNGSI SEE 
                                 //KALO BINGUNG TANYA AJA Y
-                                
-                                //OTAK ATIK DI SINI 
-                                if(!strcmp(cmd, "create")){
-									// printf("masuk create\n");
-                                    int retval;
-                                    char temp1[SIZE];   
-                                    char temp2[SIZE];
-                                    retval = recv(all_connections[i],temp1,SIZE, 0);
-                                    printf("ID = %s\n",temp1);
-                                    retval = recv(all_connections[i],temp2,SIZE, 0);
-                                    printf("PASS = %s\n",temp2);
 
-                                   if(isSuperUser) register_login(all_connections[i], "register", temp1, temp2, &userLoggedIn, 
-                                            all_connections[serving] );
-                                    else
-                                        printf("BUKAN SUPERUSER\n");
+                                //create command
+                                if(!strcmp(cmd, "create")){
+									create(all_connections[serving], isSuperUser);
+                                }
+                                //grant command
+                                else if(!strcmp(cmd, "grant")){
+									grant(all_connections[serving], isSuperUser);
                                 }
                                 
 
@@ -319,7 +410,7 @@ int main (int argc, char* argv[]) {
                         printf("Id of the user now : %s\n", id);
                         printf("Password of the user now : %s\n\n", password);
                     } 
-                    if (ret_val1 == -1 || ret_val2 == -1 || ret_val3 == -1) {
+                    if (ret_val1 == -1 || ret_val3 == -1) {
                         printf("recv() failed for fd: %d [%s]\n", 
                             all_connections[i], strerror(errno));
                         break;
